@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Click Points</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+    }
+    canvas {
+      border: 1px solid black;
+      cursor: crosshair;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <input type="text" id="filename" placeholder="Enter file name (e.g., points.json)" />
+  <button id="saveJson">Download JSON</button>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const saveJsonButton = document.getElementById("saveJson");
+    const ctx = canvas.getContext("2d");
+    const points = [];
+    const img = new Image();
+
+    img.src = "getpointbefore/test.png"; // 替换为你的图片路径
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+    };
+
+    let selectedPointIndex = -1;
+    let dragging = false;
+
+    function drawPointsAndLines() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      });
+      ctx.strokeStyle = "blue";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      points.forEach((point) => {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = "red";
+        ctx.fill();
+      });
+    }
+
+    canvas.addEventListener("mousedown", (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      if (event.button === 0) {
+        let closestIndex = -1;
+        let minDistance = Infinity;
+
+        points.forEach((point, index) => {
+          const distance = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+          if (distance < 10 && distance < minDistance) {
+            minDistance = distance;
+            closestIndex = index;
+          }
+        });
+
+        if (closestIndex !== -1) {
+          selectedPointIndex = closestIndex;
+          dragging = true;
+        } else {
+          points.push({ x, y });
+          drawPointsAndLines();
+        }
+      } else if (event.button === 2) {
+        points.forEach((point, index) => {
+          const distance = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+          if (distance < 10) {
+            points.splice(index, 1);
+            drawPointsAndLines();
+            return;
+          }
+        });
+      }
+    });
+
+    canvas.addEventListener("mousemove", (event) => {
+      if (dragging && selectedPointIndex !== -1) {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        points[selectedPointIndex] = { x, y };
+        drawPointsAndLines();
+      }
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      dragging = false;
+      selectedPointIndex = -1;
+    });
+
+    canvas.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
+	saveJsonButton.addEventListener("click", () => {
+	  const filenameInput = document.getElementById("filename");
+	  const filename = filenameInput.value.trim() || "points.json"; // 默认文件名为 points.json
+
+	  if (points.length === 0) {
+		alert("No points to save!");
+		return;
+	  }
+
+	  const json = JSON.stringify(points, null, 2);
+	  const blob = new Blob([json], { type: "application/json" });
+	  const link = document.createElement("a");
+
+	  link.href = URL.createObjectURL(blob);
+	  link.download = filename; // 使用用户输入的文件名
+	  link.click();
+
+	  console.log(`JSON downloaded as: ${filename}`);
+	});
+  </script>
+</body>
+</html>
