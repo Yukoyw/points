@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Point Annotation</title>
+  <style>
+    canvas {
+      border: 1px solid black;
+      cursor: crosshair;
+    }
+  </style>
+</head>
+<body>
+  <h1>Upload Image and Annotate Points</h1>
+  <input type="file" id="uploadImage" accept="image/*" />
+  <canvas id="imageCanvas"></canvas>
+  <button id="saveJson">Save JSON</button>
+
+  <script>
+    const uploadImageInput = document.getElementById("uploadImage");
+    const canvas = document.getElementById("imageCanvas");
+    const ctx = canvas.getContext("2d");
+    const saveJsonButton = document.getElementById("saveJson");
+
+    let points = [];
+    let img = null; // Variable to store the uploaded image
+    let uploadedFileName = "points.json"; // Default JSON file name
+
+    // Handle image upload
+    uploadImageInput.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        alert("No file selected!");
+        return;
+      }
+
+      uploadedFileName = file.name.replace(/\.[^/.]+$/, ".json"); // Change file extension to .json
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img = new Image();
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+
+          // Draw the uploaded image on the canvas
+          ctx.drawImage(img, 0, 0);
+
+          // Clear previous points
+          points = [];
+          console.log("Image uploaded and drawn on canvas.");
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Draw all points and lines
+    function drawPointsAndLines() {
+      if (img) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+        ctx.drawImage(img, 0, 0); // Redraw the uploaded image
+      }
+
+      points.forEach((point, index) => {
+        // Draw point as a small circle
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Draw line to the next point
+        if (index > 0) {
+          ctx.strokeStyle = "blue";
+          ctx.lineWidth = 2;
+          ctx.moveTo(points[index - 1].x, points[index - 1].y);
+          ctx.lineTo(point.x, point.y);
+          ctx.stroke();
+        }
+      });
+    }
+	
+	
+	    canvas.addEventListener("mousedown", (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      if (event.button === 0) {
+        let closestIndex = -1;
+        let minDistance = Infinity;
+
+        points.forEach((point, index) => {
+          const distance = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+          if (distance < 10 && distance < minDistance) {
+            minDistance = distance;
+            closestIndex = index;
+          }
+        });
+
+        if (closestIndex !== -1) {
+          selectedPointIndex = closestIndex;
+          dragging = true;
+        } else {
+          points.push({ x, y });
+          drawPointsAndLines();
+        }
+      } else if (event.button === 2) {
+        points.forEach((point, index) => {
+          const distance = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+          if (distance < 10) {
+            points.splice(index, 1);
+            drawPointsAndLines();
+            return;
+          }
+        });
+      }
+    });
+
+    canvas.addEventListener("mousemove", (event) => {
+      if (dragging && selectedPointIndex !== -1) {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        points[selectedPointIndex] = { x, y };
+        drawPointsAndLines();
+      }
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      dragging = false;
+      selectedPointIndex = -1;
+    });
+
+    canvas.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
+
+    // Save points as JSON
+    saveJsonButton.addEventListener("click", () => {
+      if (points.length === 0) {
+        alert("No points to save!");
+        return;
+      }
+
+      const json = JSON.stringify(points, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const link = document.createElement("a");
+
+      link.href = URL.createObjectURL(blob);
+      link.download = uploadedFileName; // Use the uploaded file name with .json extension
+      link.click();
+
+      console.log(`JSON downloaded as: ${uploadedFileName}`);
+    });
+  </script>
+</body>
+</html>
